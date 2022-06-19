@@ -19,7 +19,7 @@ class CameraCalibratorController:
             ret, frame = cap.read()
             #frame = cv2.resize(frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
     
-            self.image_view.show_image_in_window('Webcam', frame_with_chess)
+            self.image_view.show_webcam_image_in_window('Webcam', frame_with_chess)
             img = self.calibrate_camera_with_chess_function(frame)
             frame_with_chess = img
 
@@ -50,11 +50,62 @@ class CameraCalibratorController:
             objpoints.append(objp)
             corners2 = cv2.cornerSubPix(gray,corners, (11,11), (-1,-1), criteria)
             imgpoints.append(corners)
+
             # Draw and display the corners
             cv2.drawChessboardCorners(img, (7,6), corners2, ret)
-            #self.image_view.show_image_in_window('Calibrated Camera', img)
-            #cv2.imwrite('calibresult.png', img)
+            ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
+
+            # Printing results
+            print('Rotation Vectors: ')
+            print(rvecs)
+
+            print('Translation Vectors: ')
+            print(tvecs)
+
 
         return img
+
+    def convert_bgr_to_gray(self, img):
+        return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    def blur_backgrond(self, img_left, img_right):
+        img_left_gray = self.convert_bgr_to_gray(img_left)
+        img_right_gray = self.convert_bgr_to_gray(img_right)
+        out_img = cv2.cvtColor(img_left_gray, cv2.COLOR_GRAY2RGB)
+        cv2.imshow('img', out_img)
+        plt.imshow(out_img)
+        plt.show()
+        
+        stereo = cv2.StereoBM_create(numDisparities=0, blockSize=21)
+        disparity_img = stereo.compute(img_left_gray, img_right_gray) 
+
+        
+        mask = disparity_img.copy()
+        blurry_img = cv2.GaussianBlur(disparity_img, (5,5), 0)
+        print(mask > 225)
+        out_img = blurry_img.copy()
+      
+        out_img[mask > 225] = disparity_img[mask > 225]
+        plt.imshow(out_img, 'gray')
+        plt.show()
+
+        img_short16 = np.float32(out_img)
+        
+        img_short16 = ((img_short16 / 16) + 1)
+        print(img_short16)
+
+        plt.imshow(img_short16, 'gray')
+        plt.show()
+
+        out_img = cv2.cvtColor(img_short16, cv2.COLOR_GRAY2BGR)
+        cv2.imshow('img', out_img)
+        plt.imshow(out_img)
+        plt.show()
+      
+
+
+        imgs_to_show = [img_left_gray, img_right_gray, disparity_img, out_img]
+        self.image_view.show_images(imgs_to_show)
+        
 
     
