@@ -14,13 +14,14 @@ class CameraCalibratorController:
             raise IOError("Cannot open webcam")
 
         frame_with_chess = np.zeros((240, 320, 3))
+        mtx = []
 
         while True:
             ret, frame = cap.read()
             #frame = cv2.resize(frame, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
     
             self.image_view.show_webcam_image_in_window('Webcam', frame_with_chess)
-            img = self.calibrate_camera_with_chess_function(frame)
+            img, mtx = self.calibrate_camera_with_chess_function(frame)
             frame_with_chess = img
 
             c = cv2.waitKey(1)
@@ -46,6 +47,8 @@ class CameraCalibratorController:
         ret, corners = cv2.findChessboardCorners(gray, (7,6), None)
         # If found, add object points, image points (after refining them)
 
+        mtx = []
+
         if ret == True:
             objpoints.append(objp)
             corners2 = cv2.cornerSubPix(gray,corners, (11,11), (-1,-1), criteria)
@@ -63,7 +66,15 @@ class CameraCalibratorController:
             print(tvecs)
 
 
-        return img
+        return img, mtx
+
+    def save_calibration_matrix(self, img):
+        mtx = []
+        img, mtx = self.calibrate_camera_with_chess_function(img)
+        
+        mtx_out = np.asarray(mtx)
+        np.save('./content/calibration_mtx.npy', mtx_out)
+
 
     def convert_bgr_to_gray(self, img):
         return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
