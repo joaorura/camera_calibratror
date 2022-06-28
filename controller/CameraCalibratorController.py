@@ -1,6 +1,8 @@
-import numpy as np
 import cv2
-import matplotlib.pylab as plt
+import PIL.ExifTags
+import PIL.Image
+import numpy as np
+
 
 class CameraCalibratorController:
     def __init__(self, image_view):
@@ -36,9 +38,11 @@ class CameraCalibratorController:
     def calibrate_camera_with_chess_function(self, img):
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
+        chessboard_size = (7,5)
+
         # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
-        objp = np.zeros((6*7,3), np.float32)
-        objp[:,:2] = np.mgrid[0:7,0:6].T.reshape(-1,2)
+        objp = np.zeros((np.prod(chessboard_size),3),dtype=np.float32)
+        objp[:,:2] = np.mgrid[0:chessboard_size[0], 0:chessboard_size[1]].T.reshape(-1,2)
 
         # Arrays to store object points and image points from all the images.
         objpoints = [] # 3d point in real world space
@@ -46,7 +50,7 @@ class CameraCalibratorController:
 
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         # Find the chess board corners
-        ret, corners = cv2.findChessboardCorners(gray, (7,6), None)
+        ret,corners = cv2.findChessboardCorners(gray, chessboard_size, None)
         # If found, add object points, image points (after refining them)
 
         ret = []
@@ -55,11 +59,11 @@ class CameraCalibratorController:
 
         if ret == True:
             objpoints.append(objp)
-            corners2 = cv2.cornerSubPix(gray,corners, (11,11), (-1,-1), criteria)
+            corners2 = cv2.cornerSubPix(gray,corners, (5,5), (-1,-1), criteria)
             imgpoints.append(corners)
 
             # Draw and display the corners
-            cv2.drawChessboardCorners(img, (7,6), corners2, ret)
+            cv2.drawChessboardCorners(img, chessboard_size, corners2, ret)
             ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
 
             # Printing results
@@ -72,10 +76,13 @@ class CameraCalibratorController:
 
         return img, ret, mtx, dist
 
-    def save_calibration_matrix(self, img):
+    def save_calibration_matrix(self, img_path):
+        img = cv2.imread(img_path)
+
         mtx = []
         img, ret, mtx, dist = self.calibrate_camera_with_chess_function(img)
         
+        print(ret, mtx, dist)
         ret_out = np.asarray(ret)
         mtx_out = np.asarray(mtx)
         dist_out = np.asarray(dist)
@@ -84,25 +91,19 @@ class CameraCalibratorController:
         np.save('./content/calibration_mtx.npy', mtx_out)
         np.save('./content/calibration_dist.npy', dist_out)
 
+        print(ret_out, )
+        self.save_focal_distance(img_path)
 
-    def convert_bgr_to_gray(self, img):
-        return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    def get_focal_len(self, img_path):
+        exif_img = PIL.Image.open(img_path)
+        exif_data = {
+        PIL.ExifTags.TAGS[k]:v
+        for k, v in exif_img._getexif().items()
+        if k in PIL.ExifTags.TAGS}
 
-    def blur_backgrond(self, img_left, img_right):
-        img_left_gray = self.convert_bgr_to_gray(img_left)
-        img_right_gray = self.convert_bgr_to_gray(img_right)
+        focal_length_exif = exif_data['FocalLength']
 
-        stereo = cv2.StereoBM_create(numDisparities=0, blockSize=21)
-        disparity_img = stereo.compute(img_left_gray, img_right_gray) 
+        return focal_length_exif
 
-        out_img = cv2.GaussianBlur(img_left, (5,5), 3)
-        out_img[disparity_img > 128] = img_left[disparity_img > 128]
-        
-        plt.imshow(img_left)
-        plt.show()
-
-        plt.imshow(disparity_img, 'gray')
-        plt.show()
-
-        plt.imshow(out_img)
-        plt.show()
+    def save_focal_distance(self, img_path):
+        np.save("./content/focal_lenght.npy", self.get_focal_len(img_path))
