@@ -48,14 +48,14 @@ class CameraCalibratorController:
         objpoints = [] # 3d point in real world space
         imgpoints = [] # 2d points in image plane.
 
+        ret = []
+        mtx = []
+        dist = []
+
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         # Find the chess board corners
         ret,corners = cv2.findChessboardCorners(gray, chessboard_size, None)
         # If found, add object points, image points (after refining them)
-
-        ret = []
-        mtx = []
-        dist = []
 
         if ret == True:
             objpoints.append(objp)
